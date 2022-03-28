@@ -88,7 +88,7 @@ class ConvAddActivation : public NodeSelector {
       const Node* producer_node = dynamic_cast<const Node*>(&(*producer_node_ptr));
       inputs_node.push_back(producer_node);
     }
-    if (inputs_node.size() == 0) {
+    if (inputs_node.size() > 2 || inputs_node.empty()) {
       return nullptr;
     }
     size_t input_defs_count = input_defs.size();
@@ -141,7 +141,7 @@ class ConvAddActivation : public NodeSelector {
       // fused if the convolution isn't itself fused with an activation.
       if ((inputs_node[n]->OpType() == "Conv") &&
           (pre_input_defs_count < 4) && (producer_input_args_count.size() < 4) &&
-          (graph_utils::GetNodeAttribute(*inputs_node[n], "activation") == nullptr)) {
+          (graph_utils::GetNodeAttribute(*inputs_node[n], "activation") == nullptr) && inputs_node[n]->GetOutputEdgesCount() == 1) {
         if (pre_input_defs_count < 3) {
           // The optional bias parameter is empty so set to an empty string.
           // TODO, add a new null arguments for bias

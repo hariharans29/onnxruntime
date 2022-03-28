@@ -87,7 +87,7 @@ using namespace ONNX_NAMESPACE;
 namespace onnxruntime {
 namespace test {
 
-#define MODEL_FOLDER ORT_TSTR("D:\\work\\onnxruntime\\onnxruntime\\test\\testdata\\transform\\")
+#define MODEL_FOLDER ORT_TSTR("testdata/transform/")
 
 TEST_F(GraphTransformationTests, IdentityElimination) {
   auto model_uri = MODEL_FOLDER "abs-id-max.onnx";
