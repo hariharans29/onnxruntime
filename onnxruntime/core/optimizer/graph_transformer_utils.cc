@@ -162,7 +162,9 @@ InlinedVector<std::unique_ptr<GraphTransformer>> GenerateTransformers(
   InlinedVector<std::unique_ptr<GraphTransformer>> transformers;
   const bool disable_quant_qdq =
       session_options.config_options.GetConfigOrDefault(kOrtSessionOptionsDisableQuantQDQ, "0") == "1";
-
+#ifndef DISABLE_CONTRIB_OPS
+  const InlinedHashSet<std::string_view> cpu_ep = {onnxruntime::kCpuExecutionProvider};
+#endif
   switch (level) {
     case TransformerLevel::Level1: {
       // RewriteRule optimizations are the simplest (they generally remove unnecessary nodes and are cheap to run)
@@ -199,7 +201,6 @@ InlinedVector<std::unique_ptr<GraphTransformer>> GenerateTransformers(
       const bool enable_gelu_approximation =
           session_options.config_options.GetConfigOrDefault(kOrtSessionOptionsEnableGeluApproximation, "0") == "1";
 
-      const InlinedHashSet<std::string_view> cpu_ep = {onnxruntime::kCpuExecutionProvider};
       const InlinedHashSet<std::string_view> cuda_rocm_eps = {onnxruntime::kCudaExecutionProvider,
                                                               onnxruntime::kRocmExecutionProvider};
       const InlinedHashSet<std::string_view> cpu_cuda_rocm_eps = {onnxruntime::kCpuExecutionProvider,
@@ -258,19 +259,18 @@ InlinedVector<std::unique_ptr<GraphTransformer>> GenerateTransformers(
 
     case TransformerLevel::Level3: {
 #ifndef DISABLE_CONTRIB_OPS
-      const InlinedHashSet<std::string_view> cpu_ep = {onnxruntime::kCpuExecutionProvider};
       // Register the NCHWc layout transformer if supported by the platform.
       if (MlasNchwcGetBlockSize() > 1) {
         transformers.emplace_back(std::make_unique<NchwcTransformer>());
       }
       auto cpu_allocator = cpu_execution_provider.GetAllocator(0, OrtMemTypeDefault);
       transformers.emplace_back(std::make_unique<NhwcTransformer>(std::move(cpu_allocator)));
-      // NCHWCtransformer should have a higher priority versus this. because NCHWCtransformer also do the similiar things
-      // of fusion patterns and target on CPU. however, NCHWCtransformer will reorder the layout to nchwc which is only availbe for
-      // x86-64 cpu, not edge cpu like arm. at the same time, this tranformer could be used by opencl-ep/cpu-ep. So
-      // we will prefer NhwcTransformer once ort runs on x86-64 CPU, otherwise ConvAddActivationMobileFusion is enabled.
+      // NCHWCtransformer should have a higher priority versus this. Because NCHWCtransformer also do the similiar things
+      // of fusion patterns and target on CPU. However, NCHWCtransformer will reorder the layout to nchwc which is only available for
+      // x86-64 cpu, not edge cpu like arm. But This tranformer could be used by opencl-ep/cpu-ep. So
+      // we will prefer NhwcTransformer once ort runs on x86-64 CPU, otherwise ConvAddActivationFusion is enabled.
       // this PR #6351 implemented similiar fusion-pattern but only for CUDA, and can only fuse conv-add-relu, while we can fuse more activation.
-      transformers.emplace_back(std::make_unique<ConvAddActivationMobileFusion>(cpu_ep));
+      transformers.emplace_back(std::make_unique<ConvAddActivationFusion>(cpu_ep));
 #endif
     } break;
 

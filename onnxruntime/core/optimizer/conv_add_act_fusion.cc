@@ -51,7 +51,9 @@ class ConvAddActivation : public NodeSelector {
     }
     const auto* act_node = GetLoneConsumerNode(graph_viewer, *add_node);
     //even the next node is not a activation node, it's also fine.
-    if (!act_node) {
+    if (!act_node || add_node->GetOutputEdgesCount() > 1) {
+        //we can't fuse add-activation when add_node has multiple consumer nodes
+      act_node = nullptr;
     } else if (graph_utils::IsSupportedOptypeVersionAndDomain(*act_node, "Relu", {6, 13, 14}) ||
                graph_utils::IsSupportedOptypeVersionAndDomain(*act_node, "Sigmoid", {6, 13}) ||
                graph_utils::IsSupportedOptypeVersionAndDomain(*act_node, "Tanh", {6, 13}) ||
@@ -168,6 +170,10 @@ class FuseConvAddActivation : public ReplaceWithNew {
     NodeAttributes extra_fused_conv_attributes;
 
     const auto* activation = state.selected_nodes.Output(state.selected_nodes.num_outputs-1);
+    if (activation->OpType() == "Add") {
+        //activation node is the last node in conv+add+activation fusion pattern, while conv+add is also possible
+        return extra_fused_conv_attributes;
+    }
     ORT_ENFORCE(activation != nullptr, "Expected activation node.");
 
     const auto& activation_op_type = activation->OpType();
@@ -208,13 +214,22 @@ class FuseConvAddActivation : public ReplaceWithNew {
 
     const auto conv_location = NTO::NodeLocation{NTO::NodeType::kTarget, 0};
     const auto add_location = NTO::NodeLocation{NTO::NodeType::kOutput, 0};
-    const auto relu_location = NTO::NodeLocation{NTO::NodeType::kOutput, 1};
-
-    return {
-        MoveAll(conv_location, ArgType::kInput),                                       // move all inputs from conv
-        MoveAndAppend(add_location, ArgType::kInput, add_input_idx, ArgType::kInput),  // append add input
-        MoveAll(relu_location, ArgType::kOutput),                                      // move all outputs from relu
-    };
+    const auto activation_location = NTO::NodeLocation{NTO::NodeType::kOutput, 1};
+    //Conv+add+activation
+    if (state.selected_nodes.num_outputs == 2) {
+      return {
+          MoveAll(conv_location, ArgType::kInput),                                       // move all inputs from conv
+          MoveAndAppend(add_location, ArgType::kInput, add_input_idx, ArgType::kInput),  // append add input
+          MoveAll(activation_location, ArgType::kOutput),                                // move all outputs from relu
+      };
+    } else {
+      //Conv+Add only
+      return {
+          MoveAll(conv_location, ArgType::kInput),                                       // move all inputs from conv
+          MoveAndAppend(add_location, ArgType::kInput, add_input_idx, ArgType::kInput),  // append add input
+          MoveAll(add_location, ArgType::kOutput),                                       // move all outputs from relu
+      };
+    }
   }
 };
 }  // namespace actions
@@ -235,9 +250,9 @@ SelectorActionRegistry CreateSelectorActionRegistry() {
 }
 
 }  // namespace
-ConvAddActivationMobileFusion::ConvAddActivationMobileFusion(const InlinedHashSet<std::string_view>& compatible_execution_providers,
-                                                             const SatApplyContextVariant& apply_context)
+ConvAddActivationFusion::ConvAddActivationFusion(const InlinedHashSet<std::string_view>& compatible_execution_providers,
+                                                 const SatApplyContextVariant& apply_context)
     : SelectorActionTransformer{
-          "ConvAddActivationMobileFusion", CreateSelectorActionRegistry(), apply_context, compatible_execution_providers} {
+          "ConvAddActivationFusion", CreateSelectorActionRegistry(), apply_context, compatible_execution_providers} {
 }
 }  // namespace onnxruntime

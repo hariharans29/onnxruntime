@@ -158,10 +158,6 @@ Status Conv<float>::Compute(OpKernelContext* context) const {
   const Tensor* W = context->Input<Tensor>(1);
   const Tensor* B = num_inputs >= 3 ? context->Input<Tensor>(2) : nullptr;
   const Tensor* Sum = num_inputs >= 4 ? context->Input<Tensor>(3) : nullptr;
-  return ComputeBase(context, X, W, B, Sum);
-}
-
-Status Conv<float>::ComputeBase(OpKernelContext* context, const Tensor* X, const Tensor* W, const Tensor* B, const Tensor* Sum) const {
   const int64_t N = X->Shape()[0];
   const int64_t C = X->Shape()[1];
   const int64_t M = W->Shape()[0];

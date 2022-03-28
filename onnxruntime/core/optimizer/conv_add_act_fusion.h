@@ -10,16 +10,16 @@
 namespace onnxruntime {
 
 /**
-@Class ConvAddActivationMobileFusion
+@Class ConvAddActivationFusion
 
 Transformer that optimizes the graph by using NCHW nodes and a more general version of convaddrelu.
 This Fusion pattern is used to fuse Conv Add Activation together from different branch, The reason
 is that we assume the graph would be executed by sequential executor. then the orders of branch running doesn't matter
 */
-class ConvAddActivationMobileFusion : public SelectorActionTransformer {
+class ConvAddActivationFusion : public SelectorActionTransformer {
  public:
-  ConvAddActivationMobileFusion(const InlinedHashSet<std::string_view>& compatible_execution_providers = {},
-                       const SatApplyContextVariant& apply_context = {});
+  ConvAddActivationFusion(const InlinedHashSet<std::string_view>& compatible_execution_providers = {},
+                          const SatApplyContextVariant& apply_context = {});
 };
 
 }  // namespace onnxruntime
